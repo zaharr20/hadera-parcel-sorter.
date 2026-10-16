@@ -1,12 +1,14 @@
-import { revalidatePath } from "next/cache";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 async function createDay() {
   "use server";
-  await supabaseServer().from("delivery_days").insert({});
-  revalidatePath("/");
+  const { data, error } = await supabaseServer().from("delivery_days").insert({}).select("id").single();
+  if (error) throw new Error(error.message);
+  redirect(`/day/${data.id}`);
 }
 
 type Day = { id: string; day_date: string; default_city: string; parcels: { count: number }[] };
@@ -44,10 +46,10 @@ export default async function Home() {
         <h2 className="text-lg font-semibold">ימים אחרונים</h2>
         {days.length === 0 && <p className="text-neutral-500">עדיין אין ימי חלוקה.</p>}
         {days.map((d) => (
-          <div key={d.id} className="flex justify-between rounded-lg bg-white p-3 shadow-sm">
+          <Link key={d.id} href={`/day/${d.id}`} className="flex justify-between rounded-lg bg-white p-3 shadow-sm active:bg-neutral-100">
             <span>{d.day_date} · {d.default_city}</span>
             <span>{d.parcels?.[0]?.count ?? 0} חבילות</span>
-          </div>
+          </Link>
         ))}
       </section>
     </main>
