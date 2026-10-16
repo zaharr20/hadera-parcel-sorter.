@@ -15,6 +15,23 @@ const LABELS: Record<keyof ParsedLabel, string> = {
   trackingNumber: "מספר מעקב",
 };
 
+type GeoStatus = "verified" | "needs_review" | "not_found" | "test_data";
+type Result = {
+  seq: number;
+  duplicate: boolean;
+  address: string;
+  neighborhood: string | null;
+  status: GeoStatus | null;
+  note: string | null;
+};
+
+const STATUS_TEXT: Record<GeoStatus, string> = {
+  verified: "הכתובת אומתה",
+  needs_review: "דורש בדיקה",
+  not_found: "הכתובת לא נמצאה",
+  test_data: "מצב בדיקה — לא אומת",
+};
+
 const EMPTY: ParsedLabel = { street: null, houseNumber: null, apartment: null, city: null, zip: null, trackingNumber: null };
 
 // Shrink the photo before OCR and upload: faster on the phone, smaller storage.
@@ -39,10 +56,12 @@ export default function Scanner({ dayId, defaultCity }: { dayId: string; default
   const [parsed, setParsed] = useState<ParsedLabel>(EMPTY);
   const [fields, setFields] = useState<ParsedLabel>(EMPTY);
   const [message, setMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
     setMessage(null);
+    setResult(null);
     setPhase("reading");
     setProgress(0);
     const jpeg = await toJpeg(file);
@@ -80,7 +99,14 @@ export default function Scanner({ dayId, defaultCity }: { dayId: string; default
       setPhase("review");
       return;
     }
-    setMessage(json.duplicate ? `החבילה כבר נסרקה (מס׳ ${json.parcel.seq}) — לא נוספה שוב` : `נשמרה חבילה מס׳ ${json.parcel.seq}`);
+    setResult({
+      seq: json.parcel.seq,
+      duplicate: json.duplicate,
+      address: `${fields.street ?? "רחוב חסר"} ${fields.houseNumber ?? ""}`.trim(),
+      neighborhood: json.geo?.neighborhood ?? null,
+      status: json.geo?.status ?? null,
+      note: json.geo?.note ?? null,
+    });
     reset();
     router.refresh();
   }
@@ -107,7 +133,33 @@ export default function Scanner({ dayId, defaultCity }: { dayId: string; default
         onChange={(e) => onFile(e.target.files?.[0])}
       />
 
-      {message && <p className="rounded-lg bg-emerald-100 p-3 text-emerald-900">{message}</p>}
+      {message && <p className="rounded-lg bg-red-100 p-3 text-red-900">{message}</p>}
+
+      {result && phase === "idle" && (
+        <div
+          className={`flex flex-col items-center gap-1 rounded-2xl p-5 text-center ${
+            result.duplicate
+              ? "bg-amber-100 text-amber-950"
+              : result.neighborhood
+                ? "bg-emerald-100 text-emerald-950"
+                : "bg-neutral-200 text-neutral-900"
+          }`}
+        >
+          {result.duplicate ? (
+            <div className="text-xl font-bold">החבילה כבר נסרקה (מס׳ {result.seq})</div>
+          ) : (
+            <>
+              <div className="text-sm">שכונה</div>
+              <div className="text-4xl font-extrabold leading-tight">{result.neighborhood ?? "לא ידועה"}</div>
+              <div className="mt-1 text-xl">{result.address}</div>
+              <div className="text-sm">
+                חבילה מס׳ {result.seq} · {result.status ? STATUS_TEXT[result.status] : ""}
+              </div>
+              {result.note && <div className="text-sm">{result.note}</div>}
+            </>
+          )}
+        </div>
+      )}
 
       {phase === "idle" && (
         <button

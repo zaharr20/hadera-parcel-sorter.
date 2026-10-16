@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { geocodeAddress } from "@/lib/geocode";
 
 const FIELDS = ["street", "houseNumber", "apartment", "city", "zip", "trackingNumber"] as const;
 type Field = (typeof FIELDS)[number];
@@ -85,5 +86,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }));
   if (corrections.length) await db.from("user_corrections").insert(corrections);
 
-  return NextResponse.json({ duplicate: false, parcel });
+  // Look the address up and keep the neighborhood exactly as the provider returned it.
+  const geo = await geocodeAddress({ street: fields.street, houseNumber: fields.houseNumber, city: fields.city });
+  await db.from("geocode_results").insert({
+    address_id: address.id,
+    status: geo.status,
+    lat: geo.lat,
+    lng: geo.lng,
+    formatted_address: geo.formattedAddress,
+    location_type: geo.locationType,
+    provider: geo.provider,
+    place_id: geo.placeId,
+    neighborhood: geo.neighborhood,
+    neighborhood_source: geo.neighborhood ? geo.provider : null,
+    partial_match: geo.partialMatch,
+    raw_response: geo.raw,
+  });
+  if (geo.status === "verified") await db.from("parcels").update({ status: "verified" }).eq("id", parcel.id);
+
+  const { count } = await db
+    .from("parcels")
+    .select("id", { count: "exact", head: true })
+    .eq("delivery_day_id", dayId);
+
+  return NextResponse.json({
+    duplicate: false,
+    parcel,
+    geo: { status: geo.status, neighborhood: geo.neighborhood, formattedAddress: geo.formattedAddress, note: geo.note ?? null },
+    dayCount: count ?? null,
+  });
 }
