@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE, safeEqual, tokenFor } from "@/lib/auth-token";
 
-// Personal tool: one password protects every page and API route (HTTP Basic Auth).
-// The phone's browser asks once and remembers it. Any user name works.
-export function proxy(request: NextRequest) {
+// Personal tool: one password protects every page and API route.
+// Signing in on /login sets a cookie that lasts 90 days on that device.
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
+
   const password = process.env.APP_PASSWORD;
   if (!password) {
     return new NextResponse("APP_PASSWORD לא הוגדר בשרת — הגישה חסומה.", {
@@ -11,20 +15,13 @@ export function proxy(request: NextRequest) {
     });
   }
 
-  const header = request.headers.get("authorization") ?? "";
-  if (header.startsWith("Basic ")) {
-    const decoded = atob(header.slice(6));
-    const given = decoded.slice(decoded.indexOf(":") + 1);
-    if (given === password) return NextResponse.next();
-  }
+  const cookie = request.cookies.get(AUTH_COOKIE)?.value ?? "";
+  if (cookie && safeEqual(cookie, await tokenFor(password))) return NextResponse.next();
 
-  return new NextResponse("נדרשת סיסמה", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="parcel-sorter", charset="UTF-8"',
-      "content-type": "text/plain; charset=utf-8",
-    },
-  });
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "נדרשת התחברות" }, { status: 401 });
+  }
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {
