@@ -6,9 +6,22 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 async function createDay() {
   "use server";
-  const { data, error } = await supabaseServer().from("delivery_days").insert({}).select("id").single();
-  if (error) throw new Error(error.message);
-  redirect(`/day/${data.id}`);
+  let id: string | null = null;
+  let problem: string | null = null;
+  try {
+    const { data, error } = await supabaseServer().from("delivery_days").insert({}).select("id").single();
+    if (error) problem = `שגיאת מסד נתונים: ${error.message}`;
+    else id = data.id;
+  } catch (e) {
+    problem = (e as Error).message;
+  }
+  // Production hides thrown errors, so the reason travels in the URL and is shown on screen.
+  redirect(id ? `/day/${id}` : `/?error=${encodeURIComponent(problem ?? "שגיאה לא ידועה")}`);
+}
+
+async function ErrorBanner({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  return error ? <p className="rounded-lg bg-red-100 p-3 text-red-900">{error}</p> : null;
 }
 
 type Day = { id: string; day_date: string; default_city: string; parcels: { count: number }[] };
@@ -48,10 +61,13 @@ async function DayList() {
   );
 }
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
     <main className="mx-auto w-full max-w-md flex-1 p-4 flex flex-col gap-4">
       <h1 className="text-2xl font-bold">מיון חבילות</h1>
+      <Suspense fallback={null}>
+        <ErrorBanner searchParams={searchParams} />
+      </Suspense>
       <form action={createDay}>
         <button className="w-full rounded-xl bg-blue-600 py-5 text-xl font-bold text-white active:bg-blue-700">
           יום חלוקה חדש

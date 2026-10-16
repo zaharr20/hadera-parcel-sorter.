@@ -22,9 +22,17 @@ export default function DayPage({ params }: { params: Promise<{ id: string }> })
 
 async function DayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = supabaseServer();
+  let db;
+  try {
+    db = supabaseServer();
+  } catch (e) {
+    return <main className="p-4"><p className="rounded-lg bg-red-100 p-3 text-red-900">{(e as Error).message}</p></main>;
+  }
 
-  const { data: day } = await db.from("delivery_days").select("id, day_date, default_city").eq("id", id).maybeSingle();
+  const { data: day, error: dayErr } = await db.from("delivery_days").select("id, day_date, default_city").eq("id", id).maybeSingle();
+  if (dayErr) {
+    return <main className="p-4"><p className="rounded-lg bg-red-100 p-3 text-red-900">שגיאת מסד נתונים: {dayErr.message}</p></main>;
+  }
   if (!day) notFound();
 
   const { data } = await db
