@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { supabaseServer } from "@/lib/supabase-server";
 import Scanner from "./scanner";
-
-export const dynamic = "force-dynamic";
 
 type ParcelRow = {
   id: string;
@@ -13,7 +12,15 @@ type ParcelRow = {
   addresses: { street: string | null; house_number: string | null; apartment: string | null; city: string | null } | null;
 };
 
-export default async function DayPage({ params }: { params: Promise<{ id: string }> }) {
+export default function DayPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<main className="p-4 text-neutral-500">טוען…</main>}>
+      <DayContent params={params} />
+    </Suspense>
+  );
+}
+
+async function DayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = supabaseServer();
 

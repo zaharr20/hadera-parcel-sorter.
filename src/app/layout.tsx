@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Heebo } from "next/font/google";
 import "./globals.css";
-
-const heebo = Heebo({ variable: "--font-heebo", subsets: ["hebrew", "latin"] });
 
 export const metadata: Metadata = {
   title: "מיון חבילות חדרה",
@@ -11,10 +8,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
+// System Hebrew fonts: no download, works offline and loads instantly on the phone.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-[family-name:var(--font-heebo)] bg-neutral-50 text-neutral-900">
+    <html lang="he" dir="rtl" className="h-full antialiased">
+      <body
+        className="min-h-full flex flex-col bg-neutral-50 text-neutral-900"
+        style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif' }}
+      >
         {children}
       </body>
     </html>

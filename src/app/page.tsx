@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { Suspense } from "react";
 import { supabaseServer } from "@/lib/supabase-server";
-
-export const dynamic = "force-dynamic";
 
 async function createDay() {
   "use server";
@@ -13,7 +13,8 @@ async function createDay() {
 
 type Day = { id: string; day_date: string; default_city: string; parcels: { count: number }[] };
 
-export default async function Home() {
+async function DayList() {
+  await connection();
   let days: Day[] = [];
   let configError: string | null = null;
   try {
@@ -29,19 +30,10 @@ export default async function Home() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 p-4 flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">מיון חבילות</h1>
-
+    <>
       {configError && (
         <p className="rounded-lg bg-amber-100 p-3 text-amber-900">{configError}</p>
       )}
-
-      <form action={createDay}>
-        <button className="w-full rounded-xl bg-blue-600 py-5 text-xl font-bold text-white active:bg-blue-700">
-          יום חלוקה חדש
-        </button>
-      </form>
-
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">ימים אחרונים</h2>
         {days.length === 0 && <p className="text-neutral-500">עדיין אין ימי חלוקה.</p>}
@@ -52,6 +44,22 @@ export default async function Home() {
           </Link>
         ))}
       </section>
+    </>
+  );
+}
+
+export default function Home() {
+  return (
+    <main className="mx-auto w-full max-w-md flex-1 p-4 flex flex-col gap-4">
+      <h1 className="text-2xl font-bold">מיון חבילות</h1>
+      <form action={createDay}>
+        <button className="w-full rounded-xl bg-blue-600 py-5 text-xl font-bold text-white active:bg-blue-700">
+          יום חלוקה חדש
+        </button>
+      </form>
+      <Suspense fallback={<p className="text-neutral-500">טוען…</p>}>
+        <DayList />
+      </Suspense>
     </main>
   );
 }
